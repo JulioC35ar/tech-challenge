@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * @property string $role
+ * @method bool isSupervisor()
+ * @method bool isTechnician()
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -47,4 +52,15 @@ class User extends Authenticatable
             'role' => UserRole::class
         ];
     }
+
+    public function isSupervisor(): bool
+    {
+        return $this->role === UserRole::Supervisor;
+    }
+
+    public function isTechnician(): bool
+    {
+        return $this->role === UserRole::Technician;
+    }
+    
 }
