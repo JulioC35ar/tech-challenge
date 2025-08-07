@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\CommentsResource\RelationManagers\CommentsRelationManager;
 use App\Filament\Resources\MaintenanceOrderResource\Pages;
 use App\Filament\Resources\MaintenanceOrderResource\RelationManagers;
 use App\Models\MaintenanceOrder;
@@ -182,6 +183,20 @@ class MaintenanceOrderResource extends Resource
                             'rejection_reason' => $data['rejection_reason'],
                         ]);
                     }),
+
+                // Comments
+                Tables\Actions\Action::make('view_comments')
+                    ->label('View Comments')
+                    ->icon('heroicon-o-chat-bubble-left')
+                    ->modalHeading('Comments')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(function ($record) {
+                        return view('filament.modals.view-comments', [
+                            'record' => $record,
+                            'comments' => $record->comments()->latest()->get(),
+                        ]);
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -193,7 +208,7 @@ class MaintenanceOrderResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            CommentsRelationManager::class,
         ];
     }
 
@@ -230,4 +245,6 @@ class MaintenanceOrderResource extends Resource
     {
         return Auth::user()?->isSupervisor();
     }
+
+
 }
