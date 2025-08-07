@@ -75,11 +75,9 @@ class CommentResource extends Resource
                     //
                 ])
                 ->actions([
-                    Tables\Actions\EditAction::make(),
-                ])
-                ->bulkActions([
-                    Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\ActionGroup::make([
+                        Tables\Actions\EditAction::make()
+                            ->visible(fn () => auth()->user()?->isSupervisor()),
                     ]),
                 ]);
     }

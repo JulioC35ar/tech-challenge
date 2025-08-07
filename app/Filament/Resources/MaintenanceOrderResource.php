@@ -128,75 +128,91 @@ class MaintenanceOrderResource extends Resource
                 SelectFilter::make('technician_id')
                     ->relationship('technician', 'name')
                     ->label('Technician')
-                    ->searchable(),
-
-                TernaryFilter::make('my_orders')
-                    ->label('My Orders')
-                    ->placeholder('All Orders')
-                    ->trueLabel('Only Mine')
-                    ->falseLabel('Exclude Mine')
-                    ->query(function (Builder $query, $state) {
-                        if ($state === true) {
-                            return $query->where('technician_id', auth()->id());
-                        } elseif ($state === false) {
-                            return $query->where('technician_id', '!=', auth()->id());
-                        }
-
-                        return $query;
-                    }),
+                    ->searchable()
+                    ->visible(fn () => Auth::user()?->isSupervisor()),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()
+                        ->icon('heroicon-o-eye')
+                        ->tooltip('View maintenance order'),
 
-                // Iniciar orden
-                Tables\Actions\Action::make('Start')
-                    ->label('Start Work')
-                    ->visible(fn ($record): bool => auth()->user()->isTechnician() &&  $record->status === 'created')
-                    ->requiresConfirmation()
-                    ->action(fn ($record) => $record->update(['status' => 'in_progress'])),
+                    Tables\Actions\EditAction::make()
+                        ->icon('heroicon-o-pencil')
+                        ->tooltip('Edit maintenance order'),
 
-                // Marcar como pendiente aprobación
-                Tables\Actions\Action::make('Finish')
-                    ->label('Mark as Pending Approval') ->visible(fn ($record): bool => auth()->user()->isTechnician() && $record->status === 'in_progress')
-                    ->requiresConfirmation()
-                    ->action(fn ($record) => $record->update(['status' => 'pending_approval'])),
+                    Tables\Actions\Action::make('Start')
+                        ->label('Start Work')
+                        ->icon('heroicon-o-play')
+                        ->color('success')
+                        ->tooltip('Mark order as In Progress')
+                        ->visible(fn ($record) => auth()->user()->isTechnician() && $record->status === 'created')
+                        ->requiresConfirmation()
+                        ->action(fn ($record) => $record->update(['status' => 'in_progress'])),
 
-                // Aprobar
-                Tables\Actions\Action::make('Approve')
-                    ->visible(fn ($record): bool => auth()->user()->isSupervisor() && $record->status === 'pending_approval')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->action(fn ($record) => $record->update(['status' => 'approved'])),
+                    Tables\Actions\Action::make('Finish')
+                        ->label('Mark as Pending Approval')
+                        ->icon('heroicon-o-flag')
+                        ->tooltip('Finish and send for approval')
+                        ->visible(fn ($record) => auth()->user()->isTechnician() && $record->status === 'in_progress')
+                        ->requiresConfirmation()
+                        ->action(fn ($record) => $record->update(['status' => 'pending_approval'])),
 
-                // Rechazar
-                Tables\Actions\Action::make('Reject')->visible(fn ($record): bool => auth()->user()->isSupervisor() && $record->status === 'pending_approval')
-                    ->color('danger')
-                    ->form([
-                        Forms\Components\Textarea::make('rejection_reason')
-                            ->required()
-                            ->label('Reason for Rejection'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->update([
+                    Tables\Actions\Action::make('Approve')
+                        ->label('Approve')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->tooltip('Approve this order')
+                        ->visible(fn ($record) => auth()->user()->isSupervisor() && $record->status === 'pending_approval')
+                        ->requiresConfirmation()
+                        ->action(fn ($record) => $record->update(['status' => 'approved'])),
+
+                    Tables\Actions\Action::make('Reject')
+                        ->label('Reject')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->tooltip('Reject with reason')
+                        ->visible(fn ($record) => auth()->user()->isSupervisor() && $record->status === 'pending_approval')
+                        ->form([
+                            Forms\Components\Textarea::make('rejection_reason')
+                                ->label('Reason for Rejection')
+                                ->required(),
+                        ])
+                        ->action(fn ($record, array $data) => $record->update([
                             'status' => 'rejected',
                             'rejection_reason' => $data['rejection_reason'],
-                        ]);
-                    }),
+                        ])),
 
-                // Comments
-                Tables\Actions\Action::make('view_comments')
-                    ->label('View Comments')
-                    ->icon('heroicon-o-chat-bubble-left')
-                    ->modalHeading('Comments')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Close')
-                    ->modalContent(function ($record) {
-                        return view('filament.modals.view-comments', [
+                    Tables\Actions\Action::make('view_comments')
+                        ->label('View Comments')
+                        ->icon('heroicon-o-chat-bubble-left')
+                        ->tooltip('View comments for this order')
+                        ->modalHeading('Comments')
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel('Close')
+                        ->modalContent(fn ($record) => view('filament.modals.view-comments', [
                             'record' => $record,
                             'comments' => $record->comments()->latest()->get(),
-                        ]);
-                    }),
+                        ])),
+
+                    Tables\Actions\Action::make('add_comment')
+                        ->label('Add Comment')
+                        ->icon('heroicon-o-plus-circle')
+                        ->modalHeading('Add Comment')
+                        ->form([
+                            Forms\Components\Textarea::make('body')
+                                ->label('Comment')
+                                ->required()
+                                ->rows(4),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $record->comments()->create([
+                                'body' => $data['body'],
+                                'user_id' => auth()->id(),
+                            ]);
+                        })
+                        ->visible(fn () => auth()->check()),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -223,14 +239,20 @@ class MaintenanceOrderResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $user = Auth::user();
-
         $query = parent::getEloquentQuery();
 
-        if ($user->role === 'technician') {
-            // Ver solo las órdenes asignadas a él
+        $user = Auth::user();
+
+        if ($user->isTechnician() && ! request()->has('tableFilters')) {
             $query->where('technician_id', $user->id)
-                ->orderByRaw("FIELD(priority, 'high', 'medium', 'low')");
+                ->orderByRaw("
+                    CASE priority
+                        WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2
+                        WHEN 'low' THEN 3
+                        ELSE 4
+                    END
+                ");
         }
 
         return $query;

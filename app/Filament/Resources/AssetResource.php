@@ -42,10 +42,14 @@ class AssetResource extends Resource
                 TextColumn::make('created_at')->dateTime()->label('Created'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make(),
+                Tables\Actions\ActionGroup::make([
+
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn () => auth()->user()?->isSupervisor()),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->visible(fn () => auth()->user()?->isSupervisor()),
+                ]),
             ]);
     }
 

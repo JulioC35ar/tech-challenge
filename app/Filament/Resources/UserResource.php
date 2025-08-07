@@ -77,11 +77,13 @@ class UserResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                Tables\Actions\ActionGroup::make([
+
+                    Tables\Actions\EditAction::make()
+                        ->visible(fn () => auth()->user()?->isSupervisor()),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->visible(fn () => auth()->user()?->isSupervisor()),
                 ]),
             ]);
     }
@@ -121,4 +123,9 @@ class UserResource extends Resource
     {
         return Auth::user()?->isSupervisor() ?? false;
     }
+
+    // public static function canViewAny(): bool
+    // {
+    //     return Auth::user()?->isSupervisor();
+    // }
 }

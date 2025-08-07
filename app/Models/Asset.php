@@ -9,4 +9,10 @@ class Asset extends Model
     protected $fillable = [
       'name',
     ];
+    
+    public function maintenanceOrders()
+    {
+      return $this->hasMany(MaintenanceOrder::class);
+    }
 }
+
