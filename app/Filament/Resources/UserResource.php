@@ -123,9 +123,4 @@ class UserResource extends Resource
     {
         return Auth::user()?->isSupervisor() ?? false;
     }
-
-    // public static function canViewAny(): bool
-    // {
-    //     return Auth::user()?->isSupervisor();
-    // }
 }
