@@ -47,5 +47,9 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Celdas de flotación'],
             ['name' => 'Sistema de extracción de gases'],
         ]);
+
+        $this->call([
+            MaintenanceOrderSeeder::class,
+        ]);
     }
 }
