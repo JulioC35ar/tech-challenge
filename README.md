@@ -1,3 +1,7 @@
+# Documentation
+
+Documentation are available at [DOCUMENTATION.md](./DOCUMENTATION.md).
+
 # Technical Challenge: Oxygen CMMS
 
 ## Stack
